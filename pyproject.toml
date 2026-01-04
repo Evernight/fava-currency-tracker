@@ -1,0 +1,60 @@
+[project]
+name = "fava-currency-tracker"
+version = "0.1.0"
+description = "Currency exchange rate dashboard for Fava (Beancount)"
+readme = "README.md"
+requires-python = ">= 3.10"
+dependencies = [
+  "fava>=1.30",
+]
+
+[project.optional-dependencies]
+dev = [
+  "mypy>=1.8",
+  "pylint>=3.0",
+  "ruff>=0.5",
+]
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 120
+
+extend-exclude = [
+  "frontend/node_modules",
+  "src/fava_currency_tracker.egg-info",
+]
+
+[tool.pylint.format]
+max-line-length = 120
+
+[tool.pylint.'messages control']
+disable = [
+    "missing-module-docstring",
+    "missing-class-docstring",
+    "missing-function-docstring",
+]
+
+[tool.ruff.lint]
+extend-select = ["I"]
+
+[tool.ruff.lint.isort]
+force-single-line = true
+
+[tool.mypy]
+python_version = "3.10"
+mypy_path = "src"
+exclude = [
+  "^frontend/",
+  "^src/fava_currency_tracker\\.egg-info/",
+]
+
+

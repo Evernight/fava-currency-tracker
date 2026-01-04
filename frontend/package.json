@@ -1,0 +1,38 @@
+{
+  "name": "fava-currency-tracker-frontend",
+  "private": true,
+  "scripts": {
+    "build": "esbuild src/extension.ts --bundle --format=esm --loader:.css=file --outfile=../src/fava_currency_tracker/FavaCurrencyTracker.js --minify",
+    "watch": "esbuild src/extension.ts --bundle --format=esm --loader:.css=file --outfile=../src/fava_currency_tracker/FavaCurrencyTracker.js --watch",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint --fix ."
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.0",
+    "@mui/material": "^7.3.2",
+    "@tanstack/react-query": "^5.66.0",
+    "echarts": "^6.0.0",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "react-router": "^7.0.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.35.0",
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "@types/node": "^24.0.1",
+    "concurrently": "^9.2.1",
+    "esbuild": "^0.25.0",
+    "eslint": "^9.35.0",
+    "eslint-config-prettier": "^10.0.1",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.1.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.43.0"
+  }
+}
+
+
