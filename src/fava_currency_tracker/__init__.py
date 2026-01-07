@@ -268,7 +268,7 @@ class FavaCurrencyTracker(FavaExtensionBase):
         base = request.args.get("base", "").strip().upper() or None
 
         begin, end_exclusive = _get_filtered_date_range()
-        prices = list(_iter_prices(g.filtered.entries_with_all_prices))
+        prices = list(_iter_prices(g.filtered.entries))
         prices = _clamp_to_date_range(prices, begin, end_exclusive)
         if base:
             prices = [p for p in prices if p.amount.currency == base]
