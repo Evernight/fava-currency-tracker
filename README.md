@@ -4,7 +4,7 @@ A **[Fava](https://github.com/beancount/fava) extension** for **[Beancount](http
 
 Track exchange rates over time, visualize data availability, and fetch current prices via [beanprice](https://github.com/beancount/beanprice).
 
-![Screenshot](screenshot.png)
+![Screenshot](images/screenshot.png)
 
 ## Features
 
@@ -52,8 +52,6 @@ Then access the Currency Tracker tab in your Fava interface.
 
 ## Development
 
-### Setup
-
 ```bash
 # Install dependencies
 make deps
@@ -61,19 +59,6 @@ make deps
 # Start development server
 make dev
 ```
-
-To use a different ledger file:
-
-```bash
-make dev LEDGER_FILE=path/to/your.beancount
-```
-
-### Development
-
-- `make build` - Build frontend and package
-- `make test` - Run tests
-- `make lint` - Run linters (pylint, mypy, ruff)
-- `make format` - Format code (ruff)
 
 ## See Also
 - [fava-portfolio-returns](https://github.com/andreasgerstmayr/fava-portfolio-returns) - Portfolio returns analysis for Fava (referenced for this project)
