@@ -26,11 +26,13 @@ Define visual markers on your exchange rate charts to track target rates:
 ### 🔄 Automatic Price Fetching
 - Fetch current exchange rates directly from the dashboard
 - Preview price directives before saving to your ledger
-- Support for `price_fetch_multiplier` metadata on commodity directives
+- See [beanprice](https://github.com/beancount/beanprice) for setup details
+- Additionally supports `price_fetch_multiplier` metadata on commodity directives
 ```beancount
 2020-01-01 commodity EUR
   price_fetch_multiplier: 0.01
 ```
+for prices that are denominated in a different unit (e.g. cents instead of dollars)
 
 ## Installation
 
