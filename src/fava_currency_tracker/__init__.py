@@ -1,4 +1,5 @@
 import functools
+import re
 import traceback
 from dataclasses import dataclass
 from datetime import date
@@ -7,6 +8,7 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Iterable
 from typing import Optional
+from typing import TypedDict
 
 from beancount.core.data import Custom
 from fava.beans.abc import Directive
@@ -58,13 +60,22 @@ class AvailabilityDay:
     directives: list[str]
 
 
+class CurrencyMarkerEntry(TypedDict):
+    date: date
+    currency: str
+    base: str
+    value: float
+    color: Optional[str]
+    comment: Optional[str]
+
+
 def _iter_prices(entries: Iterable[Directive]) -> Iterable[Price]:
     for e in entries:
         if isinstance(e, Price):
             yield e
 
 
-def _iter_currency_markers(entries: Iterable[Directive]) -> Iterable[dict[str, object]]:
+def _iter_currency_markers(entries: Iterable[Directive]) -> Iterable[CurrencyMarkerEntry]:
     for e in entries:
         if not isinstance(e, Custom):
             continue
@@ -130,6 +141,49 @@ def _format_price_directive(p: Price) -> str:
     return f"price {p.currency} {p.amount.number} {p.amount.currency}"
 
 
+def _get_series_markers(
+    currency: str,
+    base: str,
+    begin: Optional[date],
+    end_exclusive: Optional[date],
+) -> list[SeriesMarker]:
+    marker_entries = list(_iter_currency_markers(g.filtered.entries_with_all_prices))
+    if begin or end_exclusive:
+        marker_entries = [
+            m
+            for m in marker_entries
+            if (not begin or m["date"] >= begin) and (not end_exclusive or m["date"] < end_exclusive)
+        ]
+
+    markers: list[SeriesMarker] = []
+    for m in marker_entries:
+        if m["currency"] == currency and m["base"] == base:
+            markers.append(
+                SeriesMarker(
+                    d=m["date"].isoformat(),
+                    v=m["value"],
+                    color=m["color"],
+                    comment=m["comment"],
+                )
+            )
+            continue
+
+        # If the marker was declared for the inverse pair, include it too (with inverted value).
+        if m["currency"] == base and m["base"] == currency:
+            if m["value"] == 0:
+                continue
+            markers.append(
+                SeriesMarker(
+                    d=m["date"].isoformat(),
+                    v=1.0 / m["value"],
+                    color=m["color"],
+                    comment=m["comment"],
+                )
+            )
+
+    return markers
+
+
 class FavaCurrencyTracker(FavaExtensionBase):
     report_title = "Currency Tracker"
     has_js_module = True
@@ -149,9 +203,38 @@ class FavaCurrencyTracker(FavaExtensionBase):
 
         return multipliers
 
+    def _get_commodity_price_config(self, currency: str) -> Optional[dict[str, str]]:
+        """Extract price metadata from commodity directive.
+
+        Returns a dict with 'base' and 'source' keys if found, None otherwise.
+        The price metadata format is: "BASE:source/symbol"
+        Example: "USD:pricehist.beanprice.yahoo/EURUSD=X"
+        """
+        for commodity in self.ledger.all_entries_by_type.Commodity:
+            if commodity.currency != currency:
+                continue
+
+            price_meta = commodity.meta.get("price")
+            if not price_meta:
+                continue
+
+            # Parse format: "CURRENCY:source/symbol"
+            # Match currency code (3+ uppercase letters/numbers)
+            # https://beancount.github.io/docs/fetching_prices_in_beancount.html
+            match = re.match(r"^([A-Z][A-Z0-9]{2,}):(.+)$", str(price_meta))
+            if match:
+                base_currency = match.group(1)
+                source_part = match.group(2)
+                return {
+                    "base": base_currency,
+                    "source": source_part,
+                }
+
+        return None
+
     @extension_endpoint("config")
     @api_response
-    def api_config(self):
+    def api_config(self) -> dict[str, object]:
         operating_currencies = list(self.ledger.options.get("operating_currency", []))
 
         begin, end_exclusive = _get_filtered_date_range()
@@ -189,7 +272,7 @@ class FavaCurrencyTracker(FavaExtensionBase):
 
     @extension_endpoint("series")
     @api_response
-    def api_series(self):
+    def api_series(self) -> dict[str, object]:
         currency = request.args.get("currency", "").strip().upper()
         base = request.args.get("base", "").strip().upper()
 
@@ -214,44 +297,7 @@ class FavaCurrencyTracker(FavaExtensionBase):
                 val = 1.0 / val
             points.append(SeriesPoint(d=p.date.isoformat(), v=val))
 
-        all_entries_with_prices = g.filtered.entries_with_all_prices
-        marker_entries = list(_iter_currency_markers(all_entries_with_prices))
-        # Clamp markers to filtered date range.
-        if begin or end_exclusive:
-            marker_entries = [
-                m
-                for m in marker_entries
-                if (not begin or (m["date"] and m["date"] >= begin))
-                and (not end_exclusive or (m["date"] and m["date"] < end_exclusive))
-            ]
-
-        direct_markers = [m for m in marker_entries if m["currency"] == currency and m["base"] == base]
-        inverse_markers = [m for m in marker_entries if m["currency"] == base and m["base"] == currency]
-
-        markers: list[SeriesMarker] = []
-        for m in direct_markers:
-            markers.append(
-                SeriesMarker(
-                    d=m["date"].isoformat(),
-                    v=float(m["value"]),
-                    color=m.get("color") or None,
-                    comment=m.get("comment") or None,
-                )
-            )
-
-        # If the marker was declared for the inverse pair, include it too (with inverted value).
-        for m in inverse_markers:
-            v = float(m["value"])
-            if v == 0:
-                continue
-            markers.append(
-                SeriesMarker(
-                    d=m["date"].isoformat(),
-                    v=1.0 / v,
-                    color=m.get("color") or None,
-                    comment=m.get("comment") or None,
-                )
-            )
+        markers = _get_series_markers(currency, base, begin, end_exclusive)
 
         return {
             "currency": currency,
@@ -263,7 +309,7 @@ class FavaCurrencyTracker(FavaExtensionBase):
 
     @extension_endpoint("availability")
     @api_response
-    def api_availability(self):
+    def api_availability(self) -> dict[str, object]:
         currency = request.args.get("currency", "").strip().upper() or None
         base = request.args.get("base", "").strip().upper() or None
 
@@ -302,7 +348,7 @@ class FavaCurrencyTracker(FavaExtensionBase):
 
     @extension_endpoint("prices_preview")
     @api_response
-    def api_prices_preview(self):
+    def api_prices_preview(self) -> dict[str, object]:
         date_s = request.args.get("date", "").strip()
         if not date_s:
             raise FavaAPIError("Missing date query parameter")
@@ -321,7 +367,7 @@ class FavaCurrencyTracker(FavaExtensionBase):
 
     @extension_endpoint("prices_save", methods=["POST"])
     @api_response
-    def api_prices_save(self):
+    def api_prices_save(self) -> dict[str, object]:
         payload = request.get_json(silent=True) or {}
         if not isinstance(payload, dict):
             raise FavaAPIError("Invalid JSON body")
@@ -347,6 +393,91 @@ class FavaCurrencyTracker(FavaExtensionBase):
         # already-watched paths. When this endpoint creates a brand-new file,
         # the default watcher backend may not be watching it yet. Explicitly
         # notify the watcher so the reload is triggered reliably.
+        g.ledger.watcher.notify(Path(filename))
+        g.ledger.changed()
+
+        return {"filename": filename}
+
+    @extension_endpoint("prices_preview_range")
+    @api_response
+    def api_prices_preview_range(self) -> dict[str, object]:
+        """Preview prices for a date range using the commodity's price metadata configuration."""
+        currency = request.args.get("currency", "").strip().upper()
+        start_date_s = request.args.get("startDate", "").strip()
+        end_date_s = request.args.get("endDate", "").strip()
+
+        if not currency:
+            raise FavaAPIError("Missing currency query parameter")
+        if not start_date_s:
+            raise FavaAPIError("Missing startDate query parameter")
+        if not end_date_s:
+            raise FavaAPIError("Missing endDate query parameter")
+
+        try:
+            start_date = date.fromisoformat(start_date_s)
+            end_date = date.fromisoformat(end_date_s)
+        except ValueError as e:
+            raise FavaAPIError("Invalid date format (expected YYYY-MM-DD)") from e
+
+        if start_date > end_date:
+            raise FavaAPIError("startDate must be before or equal to endDate")
+
+        # Get price configuration from commodity metadata
+        price_config = self._get_commodity_price_config(currency)
+        if not price_config:
+            raise FavaAPIError(
+                f"No 'price' metadata found for commodity {currency}. "
+                "Please add a commodity directive with price metadata, e.g.:\n"
+                f"  commodity {currency}\n"
+                f'    price: "USD:yahoo/{currency}USD=X"'
+            )
+
+        base = price_config["base"]
+        source = price_config["source"]
+
+        commodity_multipliers = self._get_commodity_multipliers()
+        fetcher = PriceFetcher(
+            str(self.ledger.beancount_file_path),
+            commodity_multipliers=commodity_multipliers,
+        )
+        return fetcher.preview_range(currency, base, start_date, end_date, source)
+
+    @extension_endpoint("prices_save_range", methods=["POST"])
+    @api_response
+    def api_prices_save_range(self) -> dict[str, object]:
+        """Save prices from a date range fetch."""
+        payload = request.get_json(silent=True) or {}
+        if not isinstance(payload, dict):
+            raise FavaAPIError("Invalid JSON body")
+
+        currency = str(payload.get("currency", "")).strip().upper()
+        start_date_s = str(payload.get("startDate", "")).strip()
+        end_date_s = str(payload.get("endDate", "")).strip()
+        content = str(payload.get("content", ""))
+
+        if not currency:
+            raise FavaAPIError("Missing currency")
+        if not start_date_s:
+            raise FavaAPIError("Missing startDate")
+        if not end_date_s:
+            raise FavaAPIError("Missing endDate")
+        if not content.strip():
+            raise FavaAPIError("Nothing to save (empty content)")
+
+        try:
+            start_date = date.fromisoformat(start_date_s)
+            end_date = date.fromisoformat(end_date_s)
+        except ValueError as e:
+            raise FavaAPIError("Invalid date format (expected YYYY-MM-DD)") from e
+
+        # Get base currency from commodity metadata for filename
+        price_config = self._get_commodity_price_config(currency)
+        base = price_config["base"] if price_config else "UNKNOWN"
+
+        fetcher = PriceFetcher(str(self.ledger.beancount_file_path))
+        filename = fetcher.save_range(currency, base, start_date, end_date, content)
+
+        # Tell Fava to reload/recompute derived data.
         g.ledger.watcher.notify(Path(filename))
         g.ledger.changed()
 

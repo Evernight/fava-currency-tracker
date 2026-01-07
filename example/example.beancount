@@ -11,10 +11,18 @@ option "operating_currency" "EUR"
   Assets:Cash  100 EUR
   Equity:Opening-Balances
 
+; Example commodity with price metadata configuration
+; The price metadata defines where to fetch exchange rates from
+; Format: "BASE_CURRENCY:source/symbol"
+; Example for USD priced in EUR using Yahoo Finance via pricehist:
+2020-01-01 commodity USD
+  price: "EUR:yahoo/USDEUR=X"
+
 ; Example commodity with price fetch multiplier
 ; This is useful when the price source returns values in different units
 ; For example, if INRG is quoted in cents (100 = 1.00 INRG), use multiplier 0.01
 2020-01-01 commodity INRG
+  price: "USD:yahoo/INRG"
   price_fetch_multiplier: 0.01
 
 include "prices.beancount"

@@ -1,12 +1,31 @@
 import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Stack, Typography } from "@mui/material";
-import { useCallback, useReducer } from "react";
-import { fetchPricesPreview, savePrices, type PricesPreviewResponse } from "../../api/prices";
+import type { ReactNode } from "react";
+import { useCallback, useMemo, useReducer } from "react";
+import {
+  fetchPricesPreview,
+  fetchPricesRangePreview,
+  savePrices,
+  savePricesRange,
+  type PricesPreviewResponse,
+} from "../../api/prices";
 
-export interface PricesFetcherProps {
+type PricesFetcherDayProps = {
+  /** Default when omitted. */
+  kind?: "day";
   date: string; // YYYY-MM-DD
   base: string | undefined;
   disabled?: boolean;
-}
+};
+
+type PricesFetcherRangeProps = {
+  kind: "range";
+  currency: string | undefined;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  disabled?: boolean;
+};
+
+export type PricesFetcherProps = PricesFetcherDayProps | PricesFetcherRangeProps;
 
 interface State {
   open: boolean;
@@ -86,14 +105,46 @@ function reducer(state: State, action: Action): State {
   }
 }
 
-export function PricesFetcher({ date, base, disabled }: PricesFetcherProps) {
+const monoSpanSx = {
+  fontFamily:
+    "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+};
+
+function MonoSpan({ children }: { children: ReactNode }) {
+  return (
+    <Box component="span" sx={monoSpanSx}>
+      {children}
+    </Box>
+  );
+}
+
+export function PricesFetcher(props: PricesFetcherProps) {
   const [state, dispatch] = useReducer(reducer, initialState);
   const { open, preview, error, isLoading, isSaving, savedFilename } = state;
 
-  const canFetch = Boolean(base) && !disabled;
+  const isRange = props.kind === "range";
+  const date = !isRange ? props.date : undefined;
+  const base = !isRange ? props.base : undefined;
+  const currency = isRange ? props.currency : undefined;
+  const startDate = isRange ? props.startDate : undefined;
+  const endDate = isRange ? props.endDate : undefined;
+
+  const canFetch = !props.disabled && (isRange ? Boolean(currency) : Boolean(base));
 
   const onFetch = useCallback(async () => {
-    if (!base) return;
+    if (isRange) {
+      if (!currency || !startDate || !endDate) return;
+      dispatch({ type: "FETCH_START" });
+      try {
+        const res = await fetchPricesRangePreview(currency, startDate, endDate);
+        dispatch({ type: "FETCH_SUCCESS", payload: res });
+      } catch (e) {
+        dispatch({ type: "FETCH_ERROR", payload: String(e) });
+      }
+      return;
+    }
+
+    if (!date || !base) return;
     dispatch({ type: "FETCH_START" });
     try {
       const res = await fetchPricesPreview(date, base);
@@ -101,73 +152,79 @@ export function PricesFetcher({ date, base, disabled }: PricesFetcherProps) {
     } catch (e) {
       dispatch({ type: "FETCH_ERROR", payload: String(e) });
     }
-  }, [base, date]);
+  }, [base, currency, date, endDate, isRange, startDate]);
 
   const onSave = useCallback(async () => {
     if (!preview) return;
     dispatch({ type: "SAVE_START" });
     try {
-      const res = await savePrices(preview.date, preview.content);
+      if (isRange) {
+        if (!currency || !startDate || !endDate) return;
+        const res = await savePricesRange(currency, startDate, endDate, preview.content);
+        dispatch({ type: "SAVE_SUCCESS", payload: res.filename });
+        return;
+      }
+
+      if (!date) return;
+      const res = await savePrices(date, preview.content);
       dispatch({ type: "SAVE_SUCCESS", payload: res.filename });
     } catch (e) {
       dispatch({ type: "SAVE_ERROR", payload: String(e) });
     }
-  }, [preview]);
+  }, [currency, date, endDate, isRange, preview, startDate]);
+
+  const buttonLabel =
+    isRange ? `Fetch ${currency} prices from ${startDate} to ${endDate}` : `Fetch all prices for ${date ?? ""}`;
+  const dialogTitle = isRange ? "Fetch prices for date range" : "Fetch prices";
+  const explanation = useMemo(() => {
+    if (isRange) {
+      return (
+        <>
+          Prices fetched using <MonoSpan>price</MonoSpan> metadata from {currency} commodity directive. Any{" "}
+          <MonoSpan>price_fetch_multiplier</MonoSpan> will be applied.
+        </>
+      );
+    }
+    return (
+      <>
+        Any <MonoSpan>price_fetch_multiplier</MonoSpan> metadata on commodity directives will be
+        applied to the fetched prices.
+      </>
+    );
+  }, [isRange, currency]);
 
   return (
     <>
       <Button size="small" variant="outlined" onClick={onFetch} disabled={!canFetch}>
-        Fetch all prices for {date}
+        {buttonLabel}
       </Button>
 
       <Dialog open={open} onClose={() => dispatch({ type: "CLOSE_DIALOG" })} maxWidth="md" fullWidth>
-        <DialogTitle>Fetch prices</DialogTitle>
+        <DialogTitle>{dialogTitle}</DialogTitle>
         <DialogContent dividers>
           <Stack spacing={1.25}>
             {error ? <Alert severity="error">{error}</Alert> : null}
-            {savedFilename ? <Alert severity="success">Saved to {savedFilename}</Alert> : null}
+            {isSaving && !savedFilename ? (
+              <CircularProgress size={24} />
+            ) : savedFilename ? (
+              <Alert severity="success">Saved to {savedFilename}</Alert>
+            ) : null}
             {isLoading ? <CircularProgress size={24} /> : null}
 
             {preview ? (
               <>
                 <Typography variant="body2" color="text.secondary">
                   Command:{" "}
-                  <Box
-                    component="span"
-                    sx={{
-                      fontFamily:
-                        "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-                    }}
-                  >
-                    {preview.command}
-                  </Box>
+                  <MonoSpan>{preview.command}</MonoSpan>
                 </Typography>
 
                 <Typography variant="body2" color="text.secondary">
-                  Any{" "}
-                  <Box
-                    component="span"
-                    sx={{
-                      fontFamily:
-                        "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-                    }}
-                  >
-                    price_fetch_multiplier
-                  </Box>
-                  {" "}metadata on commodity directives will be applied to the fetched prices.
+                  {explanation}
                 </Typography>
-                
+
                 <Typography variant="body2" color="text.secondary">
                   Save to:{" "}
-                  <Box
-                    component="span"
-                    sx={{
-                      fontFamily:
-                        "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-                    }}
-                  >
-                    {preview.filename}
-                  </Box>
+                  <MonoSpan>{preview.filename}</MonoSpan>
                 </Typography>
                 <Box
                   component="pre"
@@ -178,8 +235,7 @@ export function PricesFetcher({ date, base, disabled }: PricesFetcherProps) {
                     borderRadius: 1,
                     overflow: "auto",
                     maxHeight: 420,
-                    fontFamily:
-                      "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+                    ...monoSpanSx,
                     fontSize: 13,
                   }}
                 >

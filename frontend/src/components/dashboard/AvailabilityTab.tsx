@@ -182,10 +182,12 @@ function AvailabilityChart(props: {
 
 function SelectedDayPanel(props: {
   selected: SelectedDay | null;
+  currency: string | undefined;
   base: string | undefined;
+  favaFilterRange?: [string, string] | null;
   onClear: () => void;
 }) {
-  const { selected, base, onClear } = props;
+  const { selected, currency, base, favaFilterRange, onClear } = props;
   if (!selected) {
     return (
       <Typography variant="body2" color="text.secondary">
@@ -193,6 +195,8 @@ function SelectedDayPanel(props: {
       </Typography>
     );
   }
+
+  const hasRangeData = Boolean(currency && favaFilterRange?.[0] && favaFilterRange?.[1]);
 
   return (
     <Box sx={{ p: 2, border: 1, borderColor: "divider", borderRadius: 1 }}>
@@ -203,6 +207,15 @@ function SelectedDayPanel(props: {
           </Typography>
           <Stack direction="row" spacing={1}>
             <PricesFetcher date={selected.date} base={base} disabled={!base} />
+            {hasRangeData && (
+              <PricesFetcher
+                kind="range"
+                currency={currency}
+                startDate={favaFilterRange![0]}
+                endDate={favaFilterRange![1]}
+                disabled={!hasRangeData}
+              />
+            )}
             <Button size="small" onClick={onClear}>
               Clear
             </Button>
@@ -237,6 +250,7 @@ function SelectedDayPanel(props: {
 }
 
 export function AvailabilityTab({
+  currency,
   base,
   favaFilterRange,
   maxCalendarYears = 4,
@@ -351,7 +365,9 @@ export function AvailabilityTab({
       </Box>
       <SelectedDayPanel
         selected={selected}
+        currency={currency}
         base={base}
+        favaFilterRange={favaFilterRange}
         onClear={() => setSelected(null)}
       />
     </Stack>

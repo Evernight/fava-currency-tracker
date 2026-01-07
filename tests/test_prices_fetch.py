@@ -20,11 +20,10 @@ class TestBeanPriceProcessing(unittest.TestCase):
 
         lines, matched = mod.PriceFetcher.process_output(output, date(2026, 1, 1), "USD")
         self.assertEqual(matched, 5)
-        # Note: Zero values are now filtered out, non-matching lines kept
-        self.assertEqual(len(lines), 4)
+        # Note: Zero values are filtered out
+        self.assertEqual(len(lines), 3)
         self.assertIn("2026-01-01 price EUR", lines[0])
         self.assertIn("1.23450000", lines[0])
-        self.assertIn("garbage line", lines[3])
 
     def test_no_base_filter(self):
         output = "2026-01-01 price EUR 1.2345 USD\n2026-01-01 price CAD 1.1111 EUR\n"
@@ -45,7 +44,7 @@ class TestBeanPriceProcessing(unittest.TestCase):
             "BTC": Decimal("0.001"),
         }
 
-        lines, matched = mod.PriceFetcher.process_output(output, date(2026, 1, 1), "USD", multipliers)
+        lines, matched = mod.PriceFetcher.process_output(output, date(2026, 1, 1), multipliers)
         self.assertEqual(matched, 2)
         self.assertEqual(len(lines), 2)
         # EUR: 100 * 0.01 = 1.00
@@ -60,7 +59,7 @@ class TestBeanPriceProcessing(unittest.TestCase):
             "EUR": Decimal("0.01"),
         }
 
-        lines, matched = mod.PriceFetcher.process_output(output, date(2026, 1, 1), "USD", multipliers)
+        lines, matched = mod.PriceFetcher.process_output(output, date(2026, 1, 1), multipliers)
         self.assertEqual(matched, 2)
         # EUR is filtered out (0 * 0.01 = 0), BTC kept
         self.assertEqual(len(lines), 1)
