@@ -271,6 +271,9 @@ export function AvailabilityTab({
       extraPadding: 40,
     });
 
+    // Calculate max value from the data for better color scaling
+    const maxCount = Math.max(1, ...data.map((d) => d.value[1]));
+
     return {
       minWidth,
       option: {
@@ -289,6 +292,8 @@ export function AvailabilityTab({
         },
         visualMap: {
           show: false,
+          min: 0,
+          max: maxCount,
         },
         calendar: {
           top: 60,

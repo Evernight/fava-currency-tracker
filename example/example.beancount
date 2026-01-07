@@ -8,7 +8,7 @@ option "operating_currency" "EUR"
 2020-01-01 open Equity:Opening-Balances EUR
 
 2020-01-01 * "Opening"
-  Assets:Cash  100 USD
+  Assets:Cash  100 EUR
   Equity:Opening-Balances
 
 ; Example commodity with price fetch multiplier
@@ -19,4 +19,4 @@ option "operating_currency" "EUR"
 
 include "prices.beancount"
 
-2025-10-09 custom "currency-marker" "USD" "EUR" 0.9 "lightgreen" "Sell here?"
+2025-10-09 custom "currency-marker" "USD" "EUR" 0.9 "lightgreen" "Sold here"

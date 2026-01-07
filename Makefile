@@ -32,7 +32,6 @@ test:
 # Usage: make dev LEDGER_FILE=path/to/file.beancount
 LEDGER_FILE ?= example/example.beancount
 dev:
-	cd frontend; npm install
-	cd frontend; npx concurrently --names fava,esbuild \
+	npx concurrently --names fava,esbuild \
 	  "cd $$(dirname $(LEDGER_FILE)) && PYTHONUNBUFFERED=1 uv run fava --debug $$(basename $(LEDGER_FILE))" \
-	  "npm run watch"
+	  "cd frontend; npm install && npm run watch"
