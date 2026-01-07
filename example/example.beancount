@@ -1,8 +1,11 @@
 option "title" "Currency Tracker Example"
-option "operating_currency" "USD"
+option "operating_currency" "EUR"
 
-2020-01-01 open Assets:Cash USD
-2020-01-01 open Equity:Opening-Balances USD
+; Enable the extension
+2020-01-01 custom "fava-extension" "fava_currency_tracker"
+
+2020-01-01 open Assets:Cash EUR
+2020-01-01 open Equity:Opening-Balances EUR
 
 2020-01-01 * "Opening"
   Assets:Cash  100 USD
@@ -10,17 +13,10 @@ option "operating_currency" "USD"
 
 ; Example commodity with price fetch multiplier
 ; This is useful when the price source returns values in different units
-; For example, if EUR is quoted in cents (100 = 1.00 EUR), use multiplier 0.01
-2020-01-01 commodity EUR
+; For example, if INRG is quoted in cents (100 = 1.00 INRG), use multiplier 0.01
+2020-01-01 commodity INRG
   price_fetch_multiplier: 0.01
 
-; Example FX rates (EUR/USD)
-2020-01-01 price EUR 1.12 USD
-2020-02-01 price EUR 1.10 USD
-2020-03-01 price EUR 1.08 USD
-2020-04-01 price EUR 1.09 USD
+include "prices.beancount"
 
-; Enable the extension
-2020-01-01 custom "fava-extension" "fava_currency_tracker"
-
-
+2025-10-09 custom "currency-marker" "USD" "EUR" 0.9 "lightgreen" "Sell here?"

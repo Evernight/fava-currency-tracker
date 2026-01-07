@@ -23,9 +23,8 @@ Define visual markers on your exchange rate charts to track target rates:
 
 ### 🔄 Automatic Price Fetching
 - Fetch current exchange rates directly from the dashboard
+- Preview price directives before saving to your ledger
 - Support for `price_fetch_multiplier` metadata on commodity directives
-- Preview prices before saving to your ledger
-
 ```beancount
 2020-01-01 commodity EUR
   price_fetch_multiplier: 0.01
@@ -78,4 +77,4 @@ make dev LEDGER_FILE=path/to/your.beancount
 - [fava-portfolio-returns](https://github.com/andreasgerstmayr/fava-portfolio-returns) - Portfolio returns analysis for Fava (referenced for this project)
 - [fava-dashboards](https://github.com/andreasgerstmayr/fava-dashboards) - Custom dashboards for Fava (referenced for this project)
 - [beanprice](https://github.com/beancount/beanprice) - Price fetching tool for Beancount (used for fetching prices)
-- [lazy-beancount](https://github.com/Evernight/lazy-beancount) - Beancount with batteries included (includes this plugin and many more)
+- [lazy-beancount](https://github.com/Evernight/lazy-beancount) - Beancount with batteries included (includes this plugin and some more)
