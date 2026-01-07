@@ -4,6 +4,8 @@ A **[Fava](https://github.com/beancount/fava) extension** for **[Beancount](http
 
 Track exchange rates over time, visualize data availability, and fetch current prices via [beanprice](https://github.com/beancount/beanprice).
 
+![Screenshot](screenshot.png)
+
 ## Features
 
 ### 📊 Interactive Currency Dashboard
