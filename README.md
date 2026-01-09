@@ -34,6 +34,11 @@ Define visual markers on your exchange rate charts to track target rates:
 ```
 for prices that are denominated in a different unit (e.g. cents instead of dollars)
 
+Prices are stored in the ```prices/``` directory. Don't forget to include this directory in your Beancount ledger:
+```beancount
+include "prices/*.bean"
+```
+
 ## Installation
 
 Install via pip:
