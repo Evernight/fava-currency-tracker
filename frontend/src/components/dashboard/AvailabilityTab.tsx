@@ -19,8 +19,6 @@ export interface AvailabilityTabProps {
   base: string | undefined;
   /** Parsed by Fava from the current time filter (inclusive). */
   favaFilterRange?: [string, string] | null;
-  /** Show at most N latest calendar years in the calendar heatmap. Default: 3. */
-  maxCalendarYears?: number;
 }
 
 function getDirectivesFromTooltipData(data: unknown): string[] {
@@ -63,50 +61,24 @@ function isoDateUtc(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-function clampRangeToLatestYears(range: [string, string], maxYears: number | undefined): [string, string] {
-  if (typeof maxYears !== "number" || !Number.isFinite(maxYears)) return range;
-  const n = Math.floor(maxYears);
-  if (n <= 0) return range;
+const DEFAULT_START = "1970-01-01";
+const MAX_CALENDAR_YEARS = 4;
 
-  const end = range[1];
+function resolveCalendarRange(favaFilterRange?: [string, string] | null): [string, string] {
+  const today = isoDateUtc(new Date());
+  let start = favaFilterRange?.[0] || DEFAULT_START;
+  let end = favaFilterRange?.[1] || today;
+
+  // Clamp to max 3 years (keep right end)
   const endYear = Number(end.slice(0, 4));
-  if (!Number.isFinite(endYear)) return range;
-
-  // Show at most N calendar years (inclusive of end year), i.e. clamp start to Jan 1 of (endYear - (N-1)).
-  const minYear = endYear - (n - 1);
+  const minYear = endYear - (MAX_CALENDAR_YEARS - 1);
   const minStart = `${minYear}-01-01`;
-  const start = range[0] < minStart ? minStart : range[0];
+  if (start < minStart) start = minStart;
   return [start, end];
 }
 
-function expandCalendarRange(
-  range: string | [string, string],
-  favaFilterRange?: [string, string] | null,
-  maxYears?: number,
-): [string, string] | null {
-  if (Array.isArray(range)) return clampRangeToLatestYears(range, maxYears);
-
-  // Prefer Fava's server-side parsed time filter range (if any), instead of
-  // trying to parse `time=` ourselves.
-  if (favaFilterRange?.[0] && favaFilterRange?.[1]) {
-    return clampRangeToLatestYears(favaFilterRange, maxYears);
-  }
-
-  const year = Number(range);
-  if (!Number.isFinite(year)) return null;
-  return clampRangeToLatestYears([`${year}-01-01`, `${year}-12-31`], maxYears);
-}
-
-function getAllDatesInRange(
-  range: string | [string, string],
-  fallbackDates: string[],
-  favaFilterRange?: [string, string] | null,
-  maxYears?: number,
-): string[] {
-  const expandedRange = expandCalendarRange(range, favaFilterRange, maxYears);
-  if (!expandedRange) return fallbackDates;
-
-  const [start, end] = expandedRange;
+function getAllDatesInRange(range: [string, string], fallbackDates: string[]): string[] {
+  const [start, end] = range;
   const out: string[] = [];
   const cur = new Date(`${start}T00:00:00Z`);
   const endDate = new Date(`${end}T00:00:00Z`);
@@ -118,19 +90,9 @@ function getAllDatesInRange(
   return out;
 }
 
-function buildAvailabilityHeatmapData(
-  days: AvailabilityDay[],
-  range: [string, string],
-  favaFilterRange?: [string, string] | null,
-  maxYears?: number,
-): HeatmapDatum[] {
+function buildAvailabilityHeatmapData(days: AvailabilityDay[], range: [string, string]): HeatmapDatum[] {
   const byDate = new Map(days.map((d) => [d.d, d] as const));
-  const allDates = getAllDatesInRange(
-    range,
-    days.map((d) => d.d),
-    favaFilterRange,
-    maxYears,
-  );
+  const allDates = getAllDatesInRange(range, days.map((d) => d.d));
 
   // Include explicit 0-count days so calendar cells are clickable.
   return allDates.map((d) => {
@@ -253,7 +215,6 @@ export function AvailabilityTab({
   currency,
   base,
   favaFilterRange,
-  maxCalendarYears = 4,
 }: AvailabilityTabProps) {
   // Always show all price directives, regardless of currency/base filters
   const { data: availability, isLoading: isLoadingAvailability, error: availabilityError } = useAvailability(
@@ -271,14 +232,10 @@ export function AvailabilityTab({
 
   const availabilityChart = useMemo((): { option: echarts.EChartsCoreOption; minWidth?: number } => {
     const days = availability?.days ?? [];
-    const today = isoDateUtc(new Date());
-    const range: [string, string] =
-      availability?.range ?? (days.length ? [days[0].d, days[days.length - 1].d] : [today, today]);
+    const range = resolveCalendarRange(favaFilterRange);
+    const data = buildAvailabilityHeatmapData(days, range);
 
-    const clampedRange = clampRangeToLatestYears(range, maxCalendarYears);
-    const data = buildAvailabilityHeatmapData(days, clampedRange, favaFilterRange, maxCalendarYears);
-
-    const minWidth = estimateCalendarMinWidthPx(clampedRange, {
+    const minWidth = estimateCalendarMinWidthPx(range, {
       cellWidth: 18,
       calendarLeft: 40,
       calendarRight: 20,
@@ -314,7 +271,7 @@ export function AvailabilityTab({
           left: 40,
           right: 20,
           cellSize: [18, 18],
-          range: clampedRange,
+          range,
           monthLabel: { formatter: "{yyyy}-{MM}" },
           yearLabel: { show: false },
         },
@@ -327,7 +284,7 @@ export function AvailabilityTab({
         ],
       },
     };
-  }, [availability, favaFilterRange, maxCalendarYears]);
+  }, [availability, favaFilterRange]);
 
   const onHeatmapClick = useCallback((params: unknown) => {
     if (typeof params !== "object" || params === null) return;
