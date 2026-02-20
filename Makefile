@@ -16,13 +16,14 @@ build: build-js
 lint:
 	cd frontend; npm run type-check
 	cd frontend; npm run lint
+	uv run python -m ruff check .
 	uv run mypy src/fava_currency_tracker tests
 	uv run pylint src/fava_currency_tracker tests
 
 format:
 	-cd frontend; npm run lint:fix
-	-uv run ruff check --fix
-	uv run ruff format .
+	-uv run python -m ruff check --fix .
+	uv run python -m ruff format .
 
 # Run Python unit tests
 test:

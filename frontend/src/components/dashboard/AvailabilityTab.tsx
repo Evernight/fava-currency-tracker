@@ -67,7 +67,7 @@ const MAX_CALENDAR_YEARS = 4;
 function resolveCalendarRange(favaFilterRange?: [string, string] | null): [string, string] {
   const today = isoDateUtc(new Date());
   let start = favaFilterRange?.[0] || DEFAULT_START;
-  let end = favaFilterRange?.[1] || today;
+  const end = favaFilterRange?.[1] || today;
 
   // Clamp to max 3 years (keep right end)
   const endYear = Number(end.slice(0, 4));
