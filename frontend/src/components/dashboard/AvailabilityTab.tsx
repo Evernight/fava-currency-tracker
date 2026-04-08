@@ -2,13 +2,19 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   CircularProgress,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
   Typography,
 } from "@mui/material";
 import * as echarts from "echarts";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useAvailability } from "../../api/availability";
+import { type PriceDirective, useAvailability } from "../../api/availability";
 import { EChart } from "../EChart";
 import { useScrollToEnd } from "../hooks";
 import { escapeHtml } from "./escapeHtml";
@@ -21,11 +27,14 @@ export interface AvailabilityTabProps {
   favaFilterRange?: [string, string] | null;
 }
 
-function getDirectivesFromTooltipData(data: unknown): string[] {
+function getDirectivesFromTooltipData(data: unknown): PriceDirective[] {
   if (typeof data !== "object" || data === null) return [];
   const directives = (data as Record<string, unknown>)["directives"];
   if (!Array.isArray(directives)) return [];
-  return directives.filter((d): d is string => typeof d === "string");
+  return directives.filter(
+    (d): d is PriceDirective =>
+      typeof d === "object" && d !== null && "currency" in d && "amount" in d,
+  );
 }
 
 function formatTooltipWithCurrencies(
@@ -51,10 +60,10 @@ function formatTooltipWithCurrencies(
   return lines.join("");
 }
 
-type SelectedDay = { date: string; count: number; directives: string[] };
+type SelectedDay = { date: string; count: number; directives: PriceDirective[] };
 
-type AvailabilityDay = { d: string; n: number; directives: string[] };
-type HeatmapDatum = { value: [string, number]; directives: string[] };
+type AvailabilityDay = { d: string; n: number; directives: PriceDirective[] };
+type HeatmapDatum = { value: [string, number]; directives: PriceDirective[] };
 
 function isoDateUtc(d: Date): string {
   // YYYY-MM-DD
@@ -185,21 +194,33 @@ function SelectedDayPanel(props: {
         </Stack>
 
         {selected.directives.length ? (
-          <Box
-            component="pre"
-            sx={{
-              m: 0,
-              p: 1.5,
-              bgcolor: "action.hover",
-              borderRadius: 1,
-              overflow: "auto",
-              maxHeight: 260,
-              fontFamily:
-                "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
-              fontSize: 13,
-            }}
-          >
-            {selected.directives.join("\n")}
+          <Box sx={{ overflow: "auto", maxHeight: 300 }}>
+            <Table size="small" stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Currency</TableCell>
+                  <TableCell>Amount</TableCell>
+                  <TableCell>Base</TableCell>
+                  <TableCell>Origin</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {selected.directives.map((d, i) => (
+                  <TableRow key={i}>
+                    <TableCell sx={{ fontFamily: "monospace" }}>{d.currency}</TableCell>
+                    <TableCell sx={{ fontFamily: "monospace" }}>{d.amount}</TableCell>
+                    <TableCell sx={{ fontFamily: "monospace" }}>{d.base_currency}</TableCell>
+                    <TableCell sx={{ fontFamily: "monospace", fontSize: 12 }}>
+                      {d.generated_by ? (
+                        <Chip label={d.generated_by} size="small" variant="outlined" />
+                      ) : d.filename ? (
+                        `${d.filename}:${d.lineno ?? "?"}`
+                      ) : null}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </Box>
         ) : (
           <Typography variant="body2" color="text.secondary">

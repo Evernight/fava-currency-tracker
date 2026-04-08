@@ -1,10 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
 import { fetchJSON } from "./api";
 
+export interface PriceDirective {
+  currency: string;
+  amount: string;
+  base_currency: string;
+  generated_by: string | null;
+  filename: string | null;
+  lineno: number | null;
+}
+
 export interface AvailabilityDay {
   d: string; // YYYY-MM-DD
   n: number;
-  directives: string[];
+  directives: PriceDirective[];
 }
 
 export interface AvailabilityResponse {
